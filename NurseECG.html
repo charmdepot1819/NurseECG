@@ -1,0 +1,877 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>NurseECG</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: ECG-paper strip on top, a numbered step rail on the left, one step card at a time. */
+:root{
+  --bg:#f1f4f6; --surface:#ffffff; --sunk:#e8edf0; --ink:#15202a; --muted:#5b6976;
+  --grid-minor:#f3d3d6; --grid-major:#e6a3aa; --trace:#15202a;
+  --accent:#a3122a; --accent-soft:#f8e6e9; --line:#d5dde3;
+  --ok:#1d7a4b; --ok-soft:#e1f3e9; --warn:#9a5800; --warn-soft:#fbefdc; --bad:#a3122a; --bad-soft:#f8e6e9;
+  --hl:rgba(163,18,42,.13); --paper:#fffafa; --skin:#f6e6dc; --rib:#c9b3a8; --bone:#fbf6ef;
+  --f-display:"IBM Plex Sans Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0e1317; --surface:#161d23; --sunk:#1d262d; --ink:#e5eaee; --muted:#94a2ae;
+  --grid-minor:#33242a; --grid-major:#5a2f39; --trace:#f1eef0;
+  --accent:#ff6f86; --accent-soft:#3a1820; --line:#29343d;
+  --ok:#52c891; --ok-soft:#12291e; --warn:#f2a947; --warn-soft:#2e2210; --bad:#ff6f86; --bad-soft:#3a1820;
+  --hl:rgba(255,111,134,.18); --paper:#181316; --skin:#2a2421; --rib:#6b5a52; --bone:#3a332e; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e1317; --surface:#161d23; --sunk:#1d262d; --ink:#e5eaee; --muted:#94a2ae;
+  --grid-minor:#33242a; --grid-major:#5a2f39; --trace:#f1eef0;
+  --accent:#ff6f86; --accent-soft:#3a1820; --line:#29343d;
+  --ok:#52c891; --ok-soft:#12291e; --warn:#f2a947; --warn-soft:#2e2210; --bad:#ff6f86; --bad-soft:#3a1820;
+  --hl:rgba(255,111,134,.18); --paper:#181316; --skin:#2a2421; --rib:#6b5a52; --bone:#3a332e; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.55}
+.wrap{max-width:1080px;margin:0 auto;padding-block:20px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header{margin:8px 0 16px}
+h1{font-family:var(--f-display);font-weight:700;font-size:clamp(30px,4.6vw,46px);line-height:1.05;margin:4px 0 0;letter-spacing:-.01em;text-wrap:balance}
+.kicker{font:600 13px/1 var(--f-display);letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin:0}
+.topbar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.topbar .in{max-width:1080px;margin:0 auto;padding-block:12px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;align-items:center;justify-content:space-between;gap:12px}
+.brand{font:700 18px/1 var(--f-display);display:flex;align-items:center;gap:8px}
+.brand i{width:10px;height:10px;border-radius:50%;background:var(--accent);display:inline-block}
+.topbar a{font:500 14px/1 var(--f-body);color:var(--muted);text-decoration:none;padding:8px 12px;border-radius:8px}
+.topbar a:hover{background:var(--sunk);color:var(--ink)}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+footer{color:var(--muted);font-size:12.5px;max-width:80ch;margin-top:28px}
+.copyright{display:block;margin-top:10px;padding-top:10px;border-top:1px solid var(--line);color:var(--ink);font-weight:500}
+.wbar{height:4px;background:var(--sunk);border-radius:999px;overflow:hidden;margin:0 0 14px}
+.wbar i{display:block;height:100%;background:var(--accent);transition:width .25s}
+h1 span{color:var(--accent)}
+.tag{color:var(--muted);margin:8px 0 0;font-size:16px;max-width:60ch}
+.disclaimer{background:var(--warn-soft);color:var(--ink);border-radius:8px;padding:10px 14px;font-size:14px;margin:0 0 18px}
+.disclaimer b{color:var(--warn)}
+.strip{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:10px;overflow-x:auto}
+.strip svg{display:block;width:100%;min-width:600px;height:auto}
+.strip-cap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 16px;font-family:var(--f-mono);font-size:12px;color:var(--muted);padding:6px 4px 0}
+.layout{display:grid;grid-template-columns:230px minmax(0,1fr);gap:24px;margin-top:20px;align-items:start}
+nav ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+.layout>nav{position:sticky;top:calc(64px + env(safe-area-inset-top,0px))}
+nav button{width:100%;display:flex;gap:10px;align-items:center;text-align:left;background:none;border:0;border-radius:8px;padding:8px 10px;font:inherit;font-size:15px;color:var(--ink);cursor:pointer}
+nav button .n{font-family:var(--f-mono);font-size:12px;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;border:1px solid var(--line);color:var(--muted);flex:none}
+nav button:hover{background:var(--accent-soft)}
+nav button[aria-current="step"]{background:var(--accent-soft);font-weight:700}
+nav button[aria-current="step"] .n{background:var(--accent);border-color:var(--accent);color:var(--surface)}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+main,nav{min-width:0}
+.card{scroll-margin-top:72px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:22px 24px}
+.eyebrow{font:600 11px/1 var(--f-display);letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin:0 0 4px}
+h2{font-family:var(--f-display);font-weight:600;font-size:clamp(24px,3vw,30px);line-height:1.15;margin:0 0 6px;text-wrap:balance}
+.lead{margin:0 0 18px;color:var(--muted);max-width:65ch}
+h3{font:600 13px/1.3 var(--f-display);text-transform:uppercase;letter-spacing:.08em;margin:20px 0 8px;color:var(--muted)}
+.card p,.card li{max-width:68ch}
+.card ul,.card ol{padding-left:20px;margin:0}
+.card li{margin:4px 0}
+.normal{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin:4px 0}
+.nv{background:var(--ok-soft);border:1px solid color-mix(in srgb,var(--ok) 35%,transparent);border-radius:8px;padding:10px 12px}
+.nv .k{font-size:13px;color:var(--muted)}
+.nv .v{font:600 19px/1.2 var(--f-mono);color:var(--ok);font-variant-numeric:tabular-nums}
+.tbl{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:15px}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:13px;color:var(--muted);font-weight:700}
+.tip{background:var(--sunk);border-left:3px solid var(--accent);border-radius:8px;padding:12px 14px;margin-top:18px}
+.tip b{color:var(--accent)}
+.refs{font-size:13px;color:var(--muted);margin-top:16px}
+sup a,.refs a{color:var(--accent)}
+.tool{border:1px dashed var(--line);background:var(--surface);border-radius:10px;padding:14px 16px;margin-top:18px}
+.tool h4{margin:0 0 10px;font-size:16px}
+.row{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:end}
+label{display:flex;flex-direction:column;font-size:13px;color:var(--muted);gap:4px}
+input,select{font:inherit;font-family:var(--f-mono);font-size:16px;padding:7px 10px;border:1px solid var(--line);border-radius:6px;background:var(--sunk);color:var(--ink);width:150px}
+.out{font-family:var(--f-mono);font-size:15px;margin-top:10px;padding:8px 12px;border-radius:6px;background:var(--bg)}
+.out.ok{background:var(--ok-soft);color:var(--ok)}.out.warn{background:var(--warn-soft);color:var(--warn)}.out.bad{background:var(--bad-soft);color:var(--bad)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.seg button{font:inherit;font-family:var(--f-mono);border:0;background:var(--bg);color:var(--ink);padding:6px 12px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--surface)}
+.pager{display:flex;justify-content:space-between;gap:10px;margin-top:22px}
+.pager button{font:inherit;font-weight:700;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:8px;padding:10px 16px;cursor:pointer}
+.pager button.primary{background:var(--accent);border-color:var(--accent);color:var(--surface)}
+.pager button:disabled{opacity:.4;cursor:default}
+.src{margin-top:28px}
+.src ol{font-size:14px;padding-left:22px;color:var(--muted)}
+.src li{margin:6px 0}
+.src a{color:var(--accent);word-break:break-word}
+@media (max-width:760px){
+  .layout{grid-template-columns:1fr}
+  nav ol{flex-direction:row;overflow-x:auto;position:static;padding-bottom:4px}
+  nav button{white-space:nowrap}
+  .card{padding:18px 16px}
+}
+@media (prefers-reduced-motion:reduce){.wbar i{transition:none}}
+.tabs{display:flex;gap:4px}
+.topbar .tabs a[aria-current="page"]{color:var(--ink);background:var(--sunk)}
+.pagehead{margin:4px 0 6px}
+#page-rhythms>.lead,#page-quiz>.lead{margin-bottom:14px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chipbtn{font:500 13px/1 var(--f-body);color:var(--ink);background:var(--sunk);border:1px solid transparent;border-radius:999px;padding:8px 12px;cursor:pointer}
+.chipbtn:hover{border-color:var(--line)}
+.chipbtn[aria-pressed="true"]{background:var(--accent-soft);color:var(--accent);border-color:var(--accent)}
+#rsvg,#qsvg{min-width:700px}
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden;margin:6px 0 4px}
+.facts div{background:var(--surface);padding:10px 12px}
+.facts .k{font-size:12px;color:var(--muted)}
+.facts .v{font:600 15px/1.35 var(--f-body)}
+.qtop{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font:500 12px var(--f-mono);color:var(--muted);margin-bottom:8px}
+.qq{font:600 clamp(19px,2.4vw,23px)/1.3 var(--f-display);margin:6px 0 14px}
+.qopts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+@media (max-width:560px){.qopts{grid-template-columns:minmax(0,1fr)}}
+.qopts button{text-align:left;font:500 15px/1.35 var(--f-body);padding:13px 14px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+.qopts button:hover:not(:disabled){border-color:var(--ink)}
+.qopts button:disabled{cursor:default}
+.qopts button.right{background:var(--ok-soft);border-color:var(--ok);color:var(--ok);font-weight:600}
+.qopts button.wrong{background:var(--bad-soft);border-color:var(--bad);color:var(--bad)}
+.qfb{border-radius:10px;padding:12px 14px;margin-top:14px}
+.qfb.ok{background:var(--ok-soft)}.qfb.no{background:var(--bad-soft)}
+.qfb p{margin:4px 0 0}
+.qfb .vl{font-weight:700}.qfb.ok .vl{color:var(--ok)}.qfb.no .vl{color:var(--bad)}
+.qscore{font:700 clamp(36px,6vw,52px)/1 var(--f-display);margin:6px 0 10px}
+.qmiss{padding-left:20px}
+.qmiss li{margin:8px 0}
+.qmiss span{display:block;font-size:14px;color:var(--muted)}
+@media (max-width:520px){.topbar .in{gap:6px}.brand{font-size:15px}.tabs{gap:0}.topbar .tabs a{padding:7px 6px;font-size:13px}}
+.pgrid{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:760px){.pgrid{grid-template-columns:minmax(0,1fr)}}
+.fig{margin:0;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;display:grid;gap:8px;min-width:0}
+.fig svg{width:100%;height:auto;display:block;max-height:520px}
+.fig figcaption{font-size:13.5px;color:var(--muted)}
+.sw{display:inline-block;width:12px;height:12px;border-radius:50%;border:1px solid var(--muted);vertical-align:-1px;margin-right:6px}
+.card .strip{margin:16px 0}
+.card a{color:var(--accent)}
+nav button.locked{opacity:.38;cursor:not-allowed}
+nav button.locked:hover{background:none}
+nav button.locked .n{border-style:dashed}
+.navnote{font-size:12.5px;color:var(--muted);margin:10px 10px 0}
+.linkbtn{font:inherit;color:var(--accent);background:none;border:0;padding:0;cursor:pointer;text-decoration:underline}
+@media (max-width:760px){.navnote{margin:6px 0 0}.layout>nav{position:static}}
+details.src{margin-top:28px;border-top:1px solid var(--line);padding-top:10px}
+details.src summary{cursor:pointer;font:600 13px/1.3 var(--f-display);text-transform:uppercase;letter-spacing:.08em;color:var(--muted);padding:6px 0}
+</style>
+
+<nav class="topbar" aria-label="Pages"><div class="in">
+  <span class="brand"><i aria-hidden="true"></i>NurseECG</span>
+  <div class="tabs"><a href="#guide" data-tab="guide">Guide</a><a href="#placement" data-tab="placement">ECG Placement</a><a href="#rhythms" data-tab="rhythms">Rhythms</a><a href="#quiz" data-tab="quiz">Quiz</a></div>
+</div></nav>
+<div class="wrap">
+  <header>
+    <p class="kicker">12-lead electrocardiogram</p>
+    <h1>Read any ECG, <span>one step at a time</span></h1>
+    <p class="tag">A systematic 9-step approach for nurses, a library of common rhythm strips, and a quiz to test yourself.</p>
+  </header>
+  <p class="disclaimer"><b>Educational tool only.</b> NurseECG is not a diagnostic device. Always assess the patient, compare with previous ECGs, and escalate concerns using your local policy and current AHA/ACLS algorithms.</p>
+
+  <section id="page-placement" hidden>
+    <h2 class="pagehead">ECG placement</h2>
+    <p class="lead">Correct electrode placement comes before any reading. Misplaced electrodes can create false findings or hide real ones. These are the standard positions for a resting 12-lead ECG.</p>
+    <p class="disclaimer" style="margin-top:4px"><b>Before you attach the electrodes: no metal touching the patient.</b> Remove jewellery, watches and other metal objects, and make sure the patient's skin is not touching metal such as bed rails. Move mobile phones and other electrical devices away where possible. Metal contact and nearby equipment can cause electrical interference that blurs the tracing.</p>
+    <div class="pgrid">
+      <figure class="fig">
+        <svg viewBox="0 0 460 420" role="img" aria-labelledby="chestT"><title id="chestT">Front view of the chest showing V1 to V6 electrode positions with the intercostal spaces and reference lines</title>
+          <path d="M205 12 H255 V42 Q320 50 392 74 L366 412 H94 L68 74 Q140 50 205 42 Z" fill="var(--skin)" stroke="var(--muted)" stroke-width="2"/>
+          <g fill="none" stroke="var(--rib)" stroke-width="2.2" stroke-linecap="round">
+            <path d="M245 110 C290 110 340 118 377 150"/><path d="M215 110 C170 110 120 118 83 150"/>
+            <path d="M245 140 C290 140 340 148 376 180"/><path d="M215 140 C170 140 120 148 84 180"/>
+            <path d="M245 170 C290 170 340 178 374 210"/><path d="M215 170 C170 170 120 178 86 210"/>
+            <path d="M245 200 C290 200 340 208 373 240"/><path d="M215 200 C170 200 120 208 87 240"/>
+            <path d="M245 232 C290 232 340 240 371 272"/><path d="M215 232 C170 232 120 240 89 272"/>
+          </g>
+          <path d="M215 58 L105 74" stroke="var(--muted)" stroke-width="5" stroke-linecap="round"/><path d="M245 58 L355 74" stroke="var(--muted)" stroke-width="5" stroke-linecap="round"/>
+          <rect x="215" y="62" width="30" height="210" rx="10" fill="var(--bone)" stroke="var(--muted)" stroke-width="1.5"/>
+          <line x1="215" y1="98" x2="245" y2="98" stroke="var(--muted)" stroke-width="2"/>
+          <g stroke="var(--muted)" stroke-width="1.2" stroke-dasharray="5 4">
+            <line x1="300" y1="72" x2="300" y2="330"/><line x1="345" y1="96" x2="345" y2="330"/><line x1="374" y1="110" x2="374" y2="330"/>
+          </g>
+          <g font-family="IBM Plex Sans Condensed,sans-serif" font-size="12" fill="var(--muted)">
+            <text x="296" y="326" transform="rotate(-90 296 326)">Midclavicular line</text>
+            <text x="341" y="326" transform="rotate(-90 341 326)">Anterior axillary line</text>
+            <text x="370" y="326" transform="rotate(-90 370 326)">Mid-axillary line</text>
+          </g>
+          <g font-family="IBM Plex Sans Condensed,sans-serif" font-size="12" font-weight="600" fill="var(--ink)" text-anchor="end">
+            <path d="M213 98 H160" stroke="var(--accent)" stroke-width="1.5"/><text x="156" y="94">Angle of Louis</text><text x="156" y="108" font-weight="400" fill="var(--muted)">(2nd rib joins here)</text>
+            <rect x="110" y="117" width="52" height="16" rx="4" fill="var(--surface)"/><text x="158" y="129">2nd ICS</text>
+            <rect x="110" y="177" width="52" height="16" rx="4" fill="var(--surface)"/><text x="158" y="189">4th ICS</text>
+            <rect x="110" y="207" width="52" height="16" rx="4" fill="var(--surface)"/><text x="158" y="219">5th ICS</text>
+          </g>
+          <g font-family="IBM Plex Sans,sans-serif" font-size="11" font-weight="700" text-anchor="middle">
+            <circle cx="207" cy="185" r="12" fill="#d32f2f" stroke="var(--ink)" stroke-width="1.5"/><text x="207" y="189" fill="#fff">V1</text>
+            <circle cx="253" cy="185" r="12" fill="#f5c400" stroke="var(--ink)" stroke-width="1.5"/><text x="253" y="189" fill="#111">V2</text>
+            <circle cx="277" cy="201" r="12" fill="#2e8b3d" stroke="var(--ink)" stroke-width="1.5"/><text x="277" y="205" fill="#fff">V3</text>
+            <circle cx="300" cy="217" r="12" fill="#1f5fbf" stroke="var(--ink)" stroke-width="1.5"/><text x="300" y="221" fill="#fff">V4</text>
+            <circle cx="345" cy="217" r="12" fill="#f08a1c" stroke="var(--ink)" stroke-width="1.5"/><text x="345" y="221" fill="#111">V5</text>
+            <circle cx="374" cy="217" r="12" fill="#7b3fa0" stroke="var(--ink)" stroke-width="1.5"/><text x="374" y="221" fill="#fff">V6</text>
+          </g>
+          <g font-family="IBM Plex Mono,monospace" font-size="11" fill="var(--muted)" text-anchor="middle">
+            <text x="120" y="400">Patient's RIGHT</text><text x="340" y="400">Patient's LEFT</text>
+          </g>
+        </svg>
+        <figcaption>Chest leads, front view (patient facing you). V5 and V6 sit on the same horizontal line as V4, not following the curve of the rib. Colours follow the AHA code. ICS = intercostal space.</figcaption>
+      </figure>
+      <figure class="fig">
+        <svg viewBox="0 0 260 420" role="img" aria-labelledby="limbT"><title id="limbT">Body outline showing the four limb electrodes on the wrists and ankles</title>
+          <g fill="var(--skin)" stroke="var(--muted)" stroke-width="2">
+            <circle cx="130" cy="42" r="26"/>
+            <rect x="92" y="74" width="76" height="160" rx="22"/>
+          </g>
+          <g stroke="var(--skin)" stroke-width="20" stroke-linecap="round" fill="none"><path d="M100 88 L58 225"/><path d="M160 88 L202 225"/><path d="M112 228 L104 392"/><path d="M148 228 L156 392"/></g>
+          <g stroke="var(--muted)" stroke-width="2" fill="none" opacity=".6"><path d="M90 92 L47 222"/><path d="M110 98 L69 228"/><path d="M170 92 L213 222"/><path d="M150 98 L191 228"/><path d="M102 234 L94 392"/><path d="M122 234 L114 392"/><path d="M138 234 L146 392"/><path d="M158 234 L166 392"/></g>
+          <g font-family="IBM Plex Sans,sans-serif" font-size="11" font-weight="700" text-anchor="middle">
+            <circle cx="60" cy="210" r="13" fill="#ffffff" stroke="var(--ink)" stroke-width="1.5"/><text x="60" y="214" fill="#111">RA</text>
+            <circle cx="200" cy="210" r="13" fill="#222222" stroke="var(--ink)" stroke-width="1.5"/><text x="200" y="214" fill="#fff">LA</text>
+            <circle cx="104" cy="372" r="13" fill="#2e8b3d" stroke="var(--ink)" stroke-width="1.5"/><text x="104" y="376" fill="#fff">RL</text>
+            <circle cx="156" cy="372" r="13" fill="#d32f2f" stroke="var(--ink)" stroke-width="1.5"/><text x="156" y="376" fill="#fff">LL</text>
+          </g>
+          <g font-family="IBM Plex Mono,monospace" font-size="11" fill="var(--muted)" text-anchor="middle">
+            <text x="45" y="410">RIGHT</text><text x="215" y="410">LEFT</text>
+          </g>
+        </svg>
+        <figcaption>Limb leads on the limbs (wrists or forearms, ankles or lower legs), away from the torso. RL is the ground electrode.</figcaption>
+      </figure>
+    </div>
+
+    <article class="card" style="margin-top:16px">
+      <h3 style="margin-top:0">Find the landmarks</h3>
+      <ol>
+        <li>Feel for the <b>angle of Louis</b>, the ridge where the manubrium meets the body of the sternum. The 2nd rib joins the sternum here.</li>
+        <li>Slide your finger just below the 2nd rib into the <b>2nd intercostal space</b>, then count down to the <b>4th intercostal space</b>.</li>
+        <li>Place <b>V1</b> at the right sternal border and <b>V2</b> at the left sternal border in the 4th space.</li>
+        <li>Count down one more space on the left and place <b>V4</b> in the 5th space at the midclavicular line.</li>
+        <li>Place <b>V3</b> midway between V2 and V4.</li>
+        <li>Place <b>V5</b> (anterior axillary line) and <b>V6</b> (mid-axillary line) on the <b>same horizontal level as V4</b>.</li>
+      </ol>
+      <h3>Electrode positions and colour codes</h3>
+      <div class="tbl"><table>
+        <tr><th>Electrode</th><th>Position</th><th>AHA colour</th><th>IEC label and colour</th></tr>
+        <tr><td><b>RA</b></td><td>Right arm (wrist or forearm)</td><td><span class="sw" style="background:#fff"></span>White</td><td>R · <span class="sw" style="background:#d32f2f"></span>Red</td></tr>
+        <tr><td><b>LA</b></td><td>Left arm (wrist or forearm)</td><td><span class="sw" style="background:#222"></span>Black</td><td>L · <span class="sw" style="background:#f5c400"></span>Yellow</td></tr>
+        <tr><td><b>RL</b></td><td>Right leg (ground)</td><td><span class="sw" style="background:#2e8b3d"></span>Green</td><td>N · <span class="sw" style="background:#222"></span>Black</td></tr>
+        <tr><td><b>LL</b></td><td>Left leg</td><td><span class="sw" style="background:#d32f2f"></span>Red</td><td>F · <span class="sw" style="background:#2e8b3d"></span>Green</td></tr>
+        <tr><td><b>V1</b></td><td>4th ICS, right sternal border</td><td><span class="sw" style="background:#d32f2f"></span>Red</td><td>C1 · <span class="sw" style="background:#d32f2f"></span>Red</td></tr>
+        <tr><td><b>V2</b></td><td>4th ICS, left sternal border</td><td><span class="sw" style="background:#f5c400"></span>Yellow</td><td>C2 · <span class="sw" style="background:#f5c400"></span>Yellow</td></tr>
+        <tr><td><b>V3</b></td><td>Midway between V2 and V4</td><td><span class="sw" style="background:#2e8b3d"></span>Green</td><td>C3 · <span class="sw" style="background:#2e8b3d"></span>Green</td></tr>
+        <tr><td><b>V4</b></td><td>5th ICS, left midclavicular line</td><td><span class="sw" style="background:#1f5fbf"></span>Blue</td><td>C4 · <span class="sw" style="background:#7a4a1e"></span>Brown</td></tr>
+        <tr><td><b>V5</b></td><td>Left anterior axillary line, level with V4</td><td><span class="sw" style="background:#f08a1c"></span>Orange</td><td>C5 · <span class="sw" style="background:#222"></span>Black</td></tr>
+        <tr><td><b>V6</b></td><td>Left mid-axillary line, level with V4</td><td><span class="sw" style="background:#7b3fa0"></span>Purple</td><td>C6 · <span class="sw" style="background:#7b3fa0"></span>Purple</td></tr>
+      </table></div>
+      <p class="refs" style="margin-top:8px">Colour codes vary by region and manufacturer. Always go by the letters printed on the lead wires. AHA mnemonic for the limb leads: <i>white on right, smoke (black) over fire (red), snow (white) over grass (green)</i>.</p>
+
+      <h3>Getting it right</h3>
+      <ul>
+        <li><b>Skin preparation:</b> clean, dry skin; clip hair if needed and gently abrade to lower impedance and artefact.</li>
+        <li><b>Women and larger breasts:</b> place V3–V6 under the breast, not on top of breast tissue.</li>
+        <li><b>Limb electrodes on the torso</b> (as used for bedside monitoring) change the ECG. For a diagnostic 12-lead keep them on the limbs, and write on the tracing if torso placement was used.</li>
+        <li><b>Patient position:</b> lying supine and relaxed, limbs supported, to reduce muscle tremor.</li>
+        <li><b>Consistency:</b> use the same positions for serial ECGs so changes are real, not due to moved electrodes.</li>
+      </ul>
+
+      <h3>Common placement errors</h3>
+      <div class="tbl"><table>
+        <tr><th>Error</th><th>What it can look like</th></tr>
+        <tr><td>V1 and V2 placed too high (2nd or 3rd ICS)</td><td>An rSr′ pattern like incomplete RBBB, poor R-wave progression, or inverted P waves in V1–V2</td></tr>
+        <tr><td>RA and LA swapped</td><td>Lead I upside down (negative P, QRS and T) with a positive aVR, which can be mistaken for dextrocardia</td></tr>
+        <tr><td>V4–V6 following the rib downwards instead of staying level</td><td>Changes in R-wave height and ST-T shape between serial ECGs</td></tr>
+      </table></div>
+
+      <h3>Extra leads when asked</h3>
+      <ul>
+        <li><b>Right-sided (V4R):</b> 5th ICS, right midclavicular line, a mirror of V4. Used to look for right ventricular infarction in inferior STEMI.</li>
+        <li><b>Posterior (V7–V9):</b> same horizontal level as V6, at the left posterior axillary line (V7), the tip of the scapula (V8) and next to the spine (V9). Used when ST depression in V1–V3 suggests posterior MI.</li>
+      </ul>
+      <div class="tip"><b>Then:</b> check calibration and recording quality, and start reading the ECG in the <a href="#guide" data-goto="guide">Guide</a>.</div>
+    </article>
+  </section>
+
+  <section id="page-guide">
+  <div class="strip" id="gstrip" aria-label="Labelled ECG strip showing normal sinus beats">
+    <svg id="ecg" viewBox="0 0 750 220" role="img" aria-labelledby="ecgt"><title id="ecgt">Normal sinus beats on standard ECG paper with the current step highlighted</title></svg>
+    <div class="strip-cap"><span>25 mm/s · 10 mm/mV</span><span>1 small square = 1 mm = 0.04 s (40 ms) · 1 large square = 5 mm = 0.20 s</span></div>
+  </div>
+  <div class="layout">
+    <nav aria-label="Steps"><ol id="nav"></ol><p class="navnote">Steps unlock as you press Next. <button type="button" class="linkbtn" id="unlockall">Show all steps</button><button type="button" class="linkbtn" id="relock" hidden>Start over</button></p></nav>
+    <main>
+      <article class="card" id="card" aria-live="polite"></article>
+      <div class="pager">
+        <button id="prev" type="button">← Previous</button>
+        <button id="next" type="button" class="primary">Next step →</button>
+      </div>
+    </main>
+  </div>
+  </section>
+
+  <section id="page-rhythms" hidden>
+    <h2 class="pagehead">Common rhythms</h2>
+    <p class="lead">Pick a rhythm to see a 6-second lead II example strip, the features that identify it, and the first nursing actions. Strips are simplified drawings made for teaching.</p>
+    <div class="chips" id="rchips" role="group" aria-label="Rhythms"></div>
+    <div class="strip" style="margin-top:14px"><svg id="rsvg" viewBox="0 0 1500 220" role="img" aria-label="Example rhythm strip"></svg>
+      <div class="strip-cap"><span id="rcap"></span><span>6 s · 25 mm/s · 10 mm/mV · large square = 0.20 s</span></div></div>
+    <article class="card" id="rcard" style="margin-top:16px"></article>
+  </section>
+
+  <section id="page-quiz" hidden>
+    <h2 class="pagehead">ECG quiz</h2>
+    <p class="lead">Identify the rhythm on 10 random strips. Read each one the way the Guide teaches: rate, regularity, P waves, PR, QRS, then decide. Every answer shows the full reading. Every quiz is new.</p>
+    <article class="card" id="qcard" aria-live="polite"></article>
+  </section>
+
+  <details class="src" id="sources">
+    <summary>References</summary>
+    <ol id="srclist"></ol>
+    <p class="refs">Step order inspired by the Geeky Medics guide <a href="https://geekymedics.com/how-to-read-an-ecg/">How to read an ECG</a>; rhythm selection guided by the Healio ECG Review. All text and strips in NurseECG are original. Values are for adults; children have different normal ranges.</p>
+  </details>
+  <footer>For education and as a cross-check. NurseECG applies standard textbook and guideline criteria and cannot replace clinical judgement, a full assessment of the patient, or review by a qualified clinician.<span class="copyright">© 2026 Ralph Marco Alonzo. All rights reserved.</span></footer>
+</div>
+
+<script>
+const SOURCES = [
+ ["Kligfield P, et al. Recommendations for the standardization and interpretation of the electrocardiogram. Part I: The electrocardiogram and its technology. AHA/ACCF/HRS. Circulation. 2007;115:1306–1324.","https://doi.org/10.1161/CIRCULATIONAHA.106.180200"],
+ ["Surawicz B, et al. AHA/ACCF/HRS recommendations for the standardization and interpretation of the ECG. Part III: Intraventricular conduction disturbances. Circulation. 2009;119:e235–e240.","https://doi.org/10.1161/CIRCULATIONAHA.108.191095"],
+ ["Rautaharju PM, et al. AHA/ACCF/HRS recommendations … Part IV: The ST segment, T and U waves, and the QT interval. Circulation. 2009;119:e241–e250.","https://doi.org/10.1161/CIRCULATIONAHA.108.191096"],
+ ["Hancock EW, et al. AHA/ACCF/HRS recommendations … Part V: ECG changes associated with cardiac chamber hypertrophy. Circulation. 2009;119:e251–e261.","https://doi.org/10.1161/CIRCULATIONAHA.108.191097"],
+ ["Wagner GS, et al. AHA/ACCF/HRS recommendations … Part VI: Acute ischemia/infarction. Circulation. 2009;119:e262–e270.","https://doi.org/10.1161/CIRCULATIONAHA.108.191098"],
+ ["Thygesen K, et al. Fourth Universal Definition of Myocardial Infarction (2018). Circulation. 2018;138:e618–e651.","https://doi.org/10.1161/CIR.0000000000000617"],
+ ["Drew BJ, et al. Prevention of torsade de pointes in hospital settings: AHA/ACCF scientific statement. Circulation. 2010;121:1047–1060.","https://doi.org/10.1161/CIRCULATIONAHA.109.192704"],
+ ["Sandau KE, et al. Update to practice standards for electrocardiographic monitoring in hospital settings: AHA scientific statement. Circulation. 2017;136:e273–e344.","https://doi.org/10.1161/CIR.0000000000000527"],
+ ["Kusumoto FM, et al. 2018 ACC/AHA/HRS guideline on the evaluation and management of patients with bradycardia and cardiac conduction delay. Circulation. 2019;140:e382–e482.","https://doi.org/10.1161/CIR.0000000000000628"],
+ ["Rao SV, et al. 2025 ACC/AHA/ACEP/NAEMSP/SCAI guideline for the management of patients with acute coronary syndromes. Circulation. 2025.","https://doi.org/10.1161/CIR.0000000000001309"],
+ ["American Heart Association. Part 9: Adult Advanced Life Support. 2025 AHA Guidelines for CPR and ECC. Circulation. 2025.","https://professional.heart.org/en/guidelines-statements/part-9-adult-advanced-life-support-2025-american-heart-association-guidelinescir0000000000001376"],
+ ["Ashley EA, Niebauer J. Cardiology Explained. London: Remedica; 2004. Chapter 3, Conquering the ECG. NCBI Bookshelf NBK2214.","https://www.ncbi.nlm.nih.gov/books/NBK2214/"],
+ ["Hampton J, Hampton J. The ECG Made Easy. 9th ed. Elsevier; 2019.",""],
+ ["Goldberger AL, Goldberger ZD, Shvilkin A. Goldberger's Clinical Electrocardiography: A Simplified Approach. 10th ed. Elsevier; 2023.","https://shop.elsevier.com/books/goldbergers-clinical-electrocardiography/goldberger/978-0-323-82475-0"]
+];
+const r = () => ''; // inline citations hidden for a cleaner page; full list stays under References
+
+/* t = seconds on the strip; beat 1 starts at 0.4 s, beat 2 at 1.2 s (HR 75) */
+const STEPS = [
+ {t:"Before you start", hl:null, body:`
+  <p class="lead">A good reading starts with a good recording. Check the basics before you look at any waves.</p>
+  <h3>Check</h3>
+  <ul>
+   <li>Right patient, date and time on the tracing. Note symptoms (chest pain, breathlessness, palpitations, dizziness) at the time of recording.</li>
+   <li>Calibration: paper speed 25 mm/s and gain 10 mm/mV. The calibration pulse should be 10 mm tall. ${r(1)}</li>
+   <li>Quality: a steady baseline without movement artefact or 50/60 Hz interference. Good skin preparation reduces artefact. ${r(8)}</li>
+   <li>Compare with a previous ECG whenever one exists. New change matters more than a single abnormal value.</li>
+  </ul>
+  <div class="tip"><b>Electrodes first.</b> Check that every electrode is in the right place before you read. See the <a href="#placement" data-goto="placement">ECG Placement</a> tab for the positions and a diagram. ${r(1)}</div>`},
+
+ {t:"Heart rate", hl:"rr", body:`
+  <p class="lead">Count how fast the ventricles are beating, using the QRS complexes.</p>
+  <div class="normal">
+   <div class="nv"><div class="k">Traditional adult range</div><div class="v">60–100 bpm</div></div>
+  </div>
+  <p>Traditional textbooks use 60–100 bpm. ${r(13,14)} The 2018 ACC/AHA/HRS guideline defines sinus bradycardia as a sinus rate below 50 bpm, so a resting rate of 50–59 bpm can be normal, for example in athletes or during sleep. ${r(9)}</p>
+  <h3>Three ways to calculate</h3>
+  <ul>
+   <li><b>Regular rhythm:</b> 300 ÷ number of large squares between two R waves. ${r(12,13)}</li>
+   <li><b>Regular rhythm, more precise:</b> 1500 ÷ number of small squares between two R waves.</li>
+   <li><b>Irregular rhythm:</b> count the QRS complexes on the 10-second rhythm strip and multiply by 6.</li>
+  </ul>
+  <h3>Try it on the strip</h3>
+  <p>Find two R waves that sit on heavy lines. Count the large squares between them (numbered below), then divide 300 by that number.</p>
+  <div data-strip></div>
+  <div class="tool"><h4>Rate calculator</h4>
+   <div class="row">
+    <label for="rm">Method<select id="rm" style="width:210px"><option value="L">Large squares (R–R)</option><option value="S">Small squares (R–R)</option><option value="C">QRS count in 10 s</option></select></label>
+    <label for="rv">Value<input id="rv" type="number" min="0" step="0.5" value="4"></label>
+   </div>
+   <div class="out" id="rout"></div>
+  </div>`},
+
+ {t:"Rhythm", hl:"rr2", body:`
+  <p class="lead">Decide whether the beats are regular, and whether the rhythm comes from the sinus node.</p>
+  <h3>Regularity</h3>
+  <p>Mark the R–R interval on a piece of paper (or use calipers) and move it along the rhythm strip.</p>
+  <ul>
+   <li><b>Regular:</b> R–R intervals are the same.</li>
+   <li><b>Regularly irregular:</b> a repeating pattern, such as dropped beats in second-degree AV block.</li>
+   <li><b>Irregularly irregular:</b> no pattern at all. Think of atrial fibrillation, especially when no clear P waves are seen.</li>
+  </ul>
+  <h3>Sinus rhythm: all of these should be true ${r(13,14)}</h3>
+  <ul>
+   <li>A P wave before every QRS, and a QRS after every P wave.</li>
+   <li>P waves upright in leads I and II, and inverted in aVR.</li>
+   <li>A constant PR interval.</li>
+  </ul>
+  <div class="tip"><b>Nursing tip.</b> Look at the patient before the monitor. Check responsiveness and a pulse. Artefact from movement or a loose lead can look like a dangerous rhythm. ${r(8)} If there is no pulse, start CPR and follow the current ACLS algorithm. ${r(11)}</div>`},
+
+ {t:"P waves", hl:"p", body:`
+  <p class="lead">P waves show atrial depolarisation. Ask: are they there, what shape are they, and is each one followed by a QRS?</p>
+  <div class="normal">
+   <div class="nv"><div class="k">Duration</div><div class="v">&lt; 120 ms</div></div>
+   <div class="nv"><div class="k">Height (lead II)</div><div class="v">&lt; 2.5 mm</div></div>
+  </div>
+    <h3>What abnormal P waves can mean</h3>
+  <ul>
+   <li><b>Absent P waves, chaotic baseline:</b> atrial fibrillation.</li>
+   <li><b>Sawtooth flutter waves</b> (often best seen in II, III, aVF): atrial flutter.</li>
+   <li><b>Tall, peaked P (≥ 2.5 mm):</b> right atrial enlargement. ${r(4)}</li>
+   <li><b>Broad, notched P (≥ 120 ms):</b> left atrial enlargement. ${r(4)}</li>
+   <li><b>More P waves than QRS complexes:</b> some degree of AV block. Go to the PR step.</li>
+  </ul>`},
+
+ {t:"PR interval", hl:"pr", body:`
+  <p class="lead">Measured from the start of the P wave to the start of the QRS. It reflects conduction from the atria through the AV node.</p>
+  <div class="normal">
+   <div class="nv"><div class="k">Normal</div><div class="v">120–200 ms</div></div>
+   <div class="nv"><div class="k">In small squares</div><div class="v">3–5</div></div>
+  </div>
+  <h3>Abnormal findings ${r(9,13,14)}</h3>
+  <div class="tbl"><table>
+   <tr><th>Finding</th><th>Think about</th></tr>
+   <tr><td>PR &gt; 200 ms, every P conducted</td><td>First-degree AV block</td></tr>
+   <tr><td>PR gets longer until a QRS is dropped, then resets</td><td>Second-degree AV block, Mobitz type I (Wenckebach)</td></tr>
+   <tr><td>Constant PR with sudden dropped QRS</td><td>Second-degree AV block, Mobitz type II. Higher risk of progressing to complete block.</td></tr>
+   <tr><td>P waves and QRS complexes march independently</td><td>Third-degree (complete) AV block</td></tr>
+   <tr><td>PR &lt; 120 ms, with a slurred upstroke (delta wave)</td><td>Ventricular pre-excitation (Wolff-Parkinson-White pattern)</td></tr>
+  </table></div>
+  <div class="tip"><b>Nursing tip.</b> Mobitz type II and complete heart block need urgent medical review. Check the patient for signs of poor perfusion (hypotension, altered consciousness, chest pain, heart failure) and have pacing equipment ready per local policy. ${r(9,11)}</div>`},
+
+ {t:"QRS complex", hl:"qrs", body:`
+  <p class="lead">The QRS shows ventricular depolarisation. Check its width, height and any pathological Q waves.</p>
+  <div class="normal">
+   <div class="nv"><div class="k">Width</div><div class="v">&lt; 120 ms</div></div>
+   <div class="nv"><div class="k">In small squares</div><div class="v">&lt; 3</div></div>
+  </div>
+  <h3>Width ${r(2)}</h3>
+  <ul>
+   <li><b>110–119 ms:</b> incomplete bundle branch block pattern.</li>
+   <li><b>≥ 120 ms:</b> complete right or left bundle branch block, a ventricular rhythm, paced rhythm, pre-excitation, hyperkalaemia or sodium channel blocking drugs.</li>
+   <li><b>RBBB:</b> rsR′ (“M” shape) in V1–V2 and a wide S wave in I and V6.</li>
+   <li><b>LBBB:</b> broad, notched R wave in I, aVL, V5–V6 and a deep, wide S wave in V1.</li>
+  </ul>
+  <h3>Height</h3>
+  <p>Very tall complexes can suggest left ventricular hypertrophy. One common voltage criterion (Sokolow-Lyon) is S in V1 + R in V5 or V6 ≥ 35 mm. Voltage alone is not diagnostic. ${r(4,12)}</p>
+  <h3>Pathological Q waves ${r(6)}</h3>
+  <p>Any Q wave in V2–V3 ≥ 20 ms, or a Q wave ≥ 30 ms wide and ≥ 1 mm deep in two contiguous leads of the same territory, is consistent with prior myocardial infarction.</p>
+  <div class="tip"><b>Nursing tip.</b> A broad-complex tachycardia should be treated as ventricular tachycardia until proven otherwise. Check for a pulse and follow the ACLS tachycardia or cardiac arrest algorithm. ${r(11)}</div>`},
+
+ {t:"ST segment", hl:"st", body:`
+  <p class="lead">The ST segment runs from the end of the QRS (the J point) to the start of the T wave. It should sit level with the baseline.</p>
+  <p>Measure ST deviation at the J point, compared with the baseline before the QRS (the PR or TP segment). ${r(5,6)}</p>
+  <h3>ST elevation suggesting acute MI (Fourth Universal Definition) ${r(6)}</h3>
+  <p>New ST elevation at the J point in <b>two contiguous leads</b>:</p>
+  <div class="tbl"><table>
+   <tr><th>Leads</th><th>Threshold</th></tr>
+   <tr><td>All leads except V2–V3</td><td style="font-family:var(--f-mono)">≥ 1 mm</td></tr>
+   <tr><td>V2–V3, men aged 40 and over</td><td style="font-family:var(--f-mono)">≥ 2 mm</td></tr>
+   <tr><td>V2–V3, men under 40</td><td style="font-family:var(--f-mono)">≥ 2.5 mm</td></tr>
+   <tr><td>V2–V3, women of any age</td><td style="font-family:var(--f-mono)">≥ 1.5 mm</td></tr>
+  </table></div>
+  <p>New horizontal or downsloping <b>ST depression ≥ 0.5 mm</b> in two contiguous leads suggests ischaemia. ${r(6)}</p>
+  <h3>Contiguous lead groups</h3>
+  <div class="tbl"><table>
+   <tr><th>Territory</th><th>Leads</th><th>Usual artery</th></tr>
+   <tr><td>Inferior</td><td>II, III, aVF</td><td>Right coronary (sometimes circumflex)</td></tr>
+   <tr><td>Septal / anterior</td><td>V1–V4</td><td>Left anterior descending</td></tr>
+   <tr><td>Lateral</td><td>I, aVL, V5–V6</td><td>Circumflex or diagonal branch</td></tr>
+  </table></div>
+  <p style="font-size:14px;color:var(--muted);margin-top:8px">ST depression in V1–V3 can reflect posterior MI; posterior leads V7–V9 help. In left bundle branch block or a paced rhythm the usual ST criteria do not apply. ${r(6)} Benign early repolarisation and high take-off are common in young adults. ${r(12)}</p>
+  <div class="tip"><b>Nursing tip.</b> Any patient with possible acute coronary syndrome should have a 12-lead ECG within 10 minutes of arrival, shown to a clinician straight away, and repeated if symptoms continue or change. ${r(10)}</div>`},
+
+ {t:"T waves", hl:"t", body:`
+  <p class="lead">T waves show ventricular repolarisation. Check their direction and shape.</p>
+  <h3>Normal pattern ${r(3,14)}</h3>
+  <ul>
+   <li>Upright in I, II and V3–V6.</li>
+   <li>Inverted in aVR.</li>
+   <li>Can be inverted in III, aVL, aVF and V1 in healthy people. T-wave inversion in V1–V3 can be normal in some groups, such as some Black athletes and young people. ${r(12)}</li>
+  </ul>
+  <h3>Abnormal findings</h3>
+  <div class="tbl"><table>
+   <tr><th>Finding</th><th>Think about</th></tr>
+   <tr><td>Tall, narrow, peaked T waves</td><td>Hyperkalaemia. Later signs: flattened P waves, longer PR, wide QRS, then a sine-wave pattern. ${r(12,14)}</td></tr>
+   <tr><td>Broad, tall “hyperacute” T waves</td><td>Very early acute MI</td></tr>
+   <tr><td>New T-wave inversion in contiguous leads</td><td>Ischaemia, ventricular strain, cardiomyopathy, raised intracranial pressure, pulmonary embolism</td></tr>
+   <tr><td>Flat T waves with U waves</td><td>Hypokalaemia</td></tr>
+  </table></div>
+  <div class="tip"><b>Nursing tip.</b> ECG signs of hyperkalaemia do not match the blood level reliably, so a normal-looking ECG does not rule it out. Check the latest potassium and report peaked T waves promptly. ${r(12,14)}</div>`},
+
+ {t:"QT interval", hl:"qt", body:`
+  <p class="lead">Measured from the start of the QRS to the end of the T wave. A long QT increases the risk of torsade de pointes, a dangerous polymorphic VT.</p>
+  <p>Use lead II or V5 and pick the lead with the longest clear QT. Because QT shortens as heart rate rises, it is corrected for rate (QTc). ${r(3,7)}</p>
+  <div class="normal">
+   <div class="nv"><div class="k">Prolonged QTc, men</div><div class="v">≥ 450 ms</div></div>
+   <div class="nv"><div class="k">Prolonged QTc, women</div><div class="v">≥ 460 ms</div></div>
+  </div>
+  <p style="margin-top:10px">A QTc above 500 ms, or a rise of more than 60 ms from baseline, carries a higher risk of torsade de pointes and should be reported. ${r(7)} A quick bedside check: at normal heart rates, the QT should be less than half the R–R interval. ${r(12)}</p>
+  <div class="tool"><h4>QTc calculator</h4>
+   <div class="row">
+    <label for="qt">QT (ms)<input id="qt" type="number" min="0" step="10" value="400"></label>
+    <label for="hr">Heart rate (bpm)<input id="hr" type="number" min="1" step="1" value="75"></label>
+    <label for="sx">Sex<select id="sx"><option value="m">Male</option><option value="f">Female</option></select></label>
+   </div>
+   <div class="out" id="qout"></div>
+   <p style="font-size:13px;color:var(--muted);margin:8px 0 0">Bazett: QTc = QT ÷ √RR. Fridericia: QTc = QT ÷ ∛RR (RR in seconds). Bazett over-corrects at fast heart rates and under-corrects at slow ones, so this calculator flags using Fridericia when the rate is above 100 bpm. ${r(3,7)}</p>
+  </div>
+  <div class="tip"><b>Nursing tip.</b> Many common drugs prolong the QT (for example some antiarrhythmics, antipsychotics, macrolide antibiotics and ondansetron). Check the QTc before and after starting them, and keep potassium and magnesium in range. ${r(7)}</div>`},
+
+ {t:"Put it together", hl:"all", body:`
+  <p class="lead">Report your findings in the same order every time, then decide how urgently to act.</p>
+  <h3>Example report</h3>
+  <p style="font-family:var(--f-mono);font-size:15px;background:var(--bg);padding:12px 14px;border-radius:8px">Sinus rhythm, rate 75 bpm. PR 160 ms, QRS 90 ms, QTc 420 ms. No ST elevation or depression. T waves normal. No change from the ECG of [date].</p>
+  <h3>Escalate immediately ${r(6,9,10,11)}</h3>
+  <ul>
+   <li>ST elevation meeting the criteria in step 6, or new ischaemic changes with symptoms.</li>
+   <li>Ventricular tachycardia, ventricular fibrillation, asystole, or any rhythm without a pulse.</li>
+   <li>Mobitz type II or complete heart block.</li>
+   <li>Any very fast or very slow rhythm with signs of poor perfusion.</li>
+   <li>QTc above 500 ms, or a new rise of more than 60 ms.</li>
+   <li>Peaked T waves or a widening QRS in a patient at risk of hyperkalaemia.</li>
+  </ul>
+  <div class="tip"><b>Remember.</b> Treat the patient, not the paper. An automated ECG report can be wrong, so always read the tracing yourself and confirm with a clinician. ${r(12)}</div>`}
+];
+
+/* ---------- ECG drawing ---------- */
+const MM = 10, W = 750, H = 220, BASE = 165; // 10 px per mm, baseline in px
+const tx = t => t * 25 * MM;                // seconds -> px at 25 mm/s
+const g = (t,c,s,a) => a * Math.exp(-((t-c)**2)/(2*s*s));
+function beat(t, t0){
+  return g(t,t0+.05,.022,.15) + g(t,t0+.17,.008,-.1) + g(t,t0+.2,.011,1.2)
+       + g(t,t0+.225,.009,-.25) + g(t,t0+.42,.045,.3);
+}
+const B1 = .4, B2 = 1.2; // R waves land on heavy grid lines at 0.6, 1.4 and 2.2 s
+const SPANS = { // highlight ranges on beat 1, seconds
+  p:[B1, B1+.11, "P wave"], pr:[B1, B1+.16, "PR interval"], qrs:[B1+.16, B1+.25, "QRS"],
+  st:[B1+.25, B1+.33, "ST segment"], t:[B1+.33, B1+.54, "T wave"], qt:[B1+.16, B1+.54, "QT interval"]
+};
+function drawECG(){
+  const svg = document.getElementById('ecg');
+  let s = `<defs><pattern id="sm" width="${MM}" height="${MM}" patternUnits="userSpaceOnUse"><path d="M${MM} 0H0V${MM}" fill="none" stroke="var(--grid-minor)" stroke-width="1"/></pattern>
+  <pattern id="lg" width="${MM*5}" height="${MM*5}" patternUnits="userSpaceOnUse"><rect width="${MM*5}" height="${MM*5}" fill="url(#sm)"/><path d="M${MM*5} 0H0V${MM*5}" fill="none" stroke="var(--grid-major)" stroke-width="1.4"/></pattern></defs>
+  <rect width="${W}" height="${H}" fill="url(#lg)"/><g id="hl"></g>`;
+  // calibration pulse 10 mm
+  let d = `M0 ${BASE}H8V${BASE-10*MM}H${8+5*MM}V${BASE}`;
+  for(let x = 8+5*MM; x <= W; x += 1){
+    const t = x / (25*MM);
+    const v = beat(t,B1) + beat(t,B2) + beat(t,B2+.8);
+    d += `L${x} ${(BASE - v*10*MM).toFixed(2)}`;
+  }
+  s += `<path d="${d}" fill="none" stroke="var(--trace)" stroke-width="2" stroke-linejoin="round"/>`;
+  s += `<text x="12" y="${BASE-10*MM-6}" font-size="11" font-family="IBM Plex Mono,monospace" fill="var(--muted)">1 mV</text>`;
+  svg.insertAdjacentHTML('beforeend', s);
+}
+function highlight(k){
+  const g = document.getElementById('hl'); if(!g) return;
+  const lab = (x1,x2,txt,y=22) => `<line x1="${x1}" x2="${x2}" y1="${y}" y2="${y}" stroke="var(--accent)" stroke-width="2"/><line x1="${x1}" x2="${x1}" y1="${y-5}" y2="${y+5}" stroke="var(--accent)" stroke-width="2"/><line x1="${x2}" x2="${x2}" y1="${y-5}" y2="${y+5}" stroke="var(--accent)" stroke-width="2"/><text x="${(x1+x2)/2}" y="${y-8}" text-anchor="middle" font-size="12" font-weight="700" font-family="IBM Plex Sans Condensed,sans-serif" fill="var(--accent)">${txt}</text>`;
+  let s = '';
+  if(k === 'rr'){
+    const a = tx(B1+.2), b = tx(B2+.2);
+    s = `<rect x="${a}" y="30" width="${b-a}" height="${H-40}" fill="var(--hl)"/>` + lab(a,b,"R–R = 4 large squares = 0.80 s → 300 ÷ 4 = 75 bpm");
+    for(let i=0;i<4;i++) s += `<circle cx="${a+25+i*50}" cy="${H-16}" r="9" fill="var(--accent)"/><text x="${a+25+i*50}" y="${H-12}" text-anchor="middle" font-size="11" font-weight="700" font-family="IBM Plex Mono,monospace" fill="var(--surface)">${i+1}</text>`;
+  } else if(k === 'rr2'){
+    const a = tx(B1+.2), b = tx(B2+.2), c = tx(B2+1);
+    s = lab(a,b,"0.80 s") + lab(b,c,"0.80 s") + `<text x="${(a+c)/2}" y="${H-10}" text-anchor="middle" font-size="12" font-weight="700" font-family="IBM Plex Sans Condensed,sans-serif" fill="var(--accent)">Equal R–R intervals = regular rhythm</text>`;
+  } else if(k === 'all'){
+    for(const key of ['p','qrs','t']){ const [a,b,n] = SPANS[key]; s += `<rect x="${tx(a)}" y="30" width="${tx(b)-tx(a)}" height="${H-40}" fill="var(--hl)"/><text x="${(tx(a)+tx(b))/2}" y="${H-14}" text-anchor="middle" font-size="12" font-weight="700" font-family="IBM Plex Sans Condensed,sans-serif" fill="var(--accent)">${n}</text>`; }
+    s += lab(tx(SPANS.pr[0]),tx(SPANS.pr[1]),"PR",22) ;
+    s += lab(tx(SPANS.qt[0]),tx(SPANS.qt[1]),"QT",22);
+  } else if(SPANS[k]){
+    const [a,b,n] = SPANS[k];
+    s = `<rect x="${tx(a)}" y="30" width="${tx(b)-tx(a)}" height="${H-40}" fill="var(--hl)"/>` + lab(tx(a),tx(b),n);
+  }
+  g.innerHTML = s;
+}
+
+/* ---------- UI ---------- */
+let cur = 0;
+const nav = document.getElementById('nav'), card = document.getElementById('card');
+nav.innerHTML = STEPS.map((s,i)=>`<li><button type="button" data-i="${i}"><span class="n">${i}</span>${s.t}</button></li>`).join('');
+let maxReached = 0;
+try{ const m = parseInt(localStorage.getItem('nurseecg-max'),10); if(m>=0) maxReached = Math.min(m, STEPS.length-1); }catch(e){}
+nav.addEventListener('click', e => { const b = e.target.closest('button'); if(!b || +b.dataset.i > maxReached) return; go(+b.dataset.i, true); });
+document.getElementById('unlockall').onclick = () => { maxReached = STEPS.length-1; try{ localStorage.setItem('nurseecg-max', maxReached); }catch(e){} go(cur,false); };
+document.getElementById('relock').onclick = () => { maxReached = 0; try{ localStorage.setItem('nurseecg-max', 0); }catch(e){} go(0,true); };
+document.getElementById('prev').onclick = () => go(cur-1, true);
+document.getElementById('next').onclick = () => { if(cur===STEPS.length-1){ maxReached = 0; try{ localStorage.setItem('nurseecg-max', 0); }catch(e){} go(0,true); } else go(cur+1, true); };
+
+function go(i, scroll){
+  cur = Math.max(0, Math.min(STEPS.length-1, i));
+  const s = STEPS[cur];
+  const stripEl = document.getElementById('gstrip'); stripEl.remove();
+  card.innerHTML = `<div class="wbar"><i style="width:${Math.round(cur/(STEPS.length-1)*100)}%"></i></div><p class="eyebrow">Step ${cur} of ${STEPS.length-1}</p><h2>${s.t}</h2>${s.body}`;
+  const ph = card.querySelector('[data-strip]') || card.querySelector('.normal') || card.querySelector('.lead');
+  if(ph.hasAttribute('data-strip')) ph.replaceWith(stripEl); else ph.after(stripEl);
+  maxReached = Math.max(maxReached, cur);
+  try{ localStorage.setItem('nurseecg-max', maxReached); }catch(e){}
+  nav.querySelectorAll('button').forEach((b,j) => { b.removeAttribute('aria-current'); const lk = j > maxReached; b.classList.toggle('locked', lk); b.setAttribute('aria-disabled', lk); b.title = lk ? 'Finish the earlier steps to unlock' : ''; });
+  document.getElementById('unlockall').hidden = maxReached >= STEPS.length-1;
+  document.getElementById('relock').hidden = maxReached < STEPS.length-1;
+  nav.querySelectorAll('button')[cur].setAttribute('aria-current','step');
+  nav.querySelectorAll('button')[cur].scrollIntoView({block:'nearest',inline:'nearest'});
+  document.getElementById('prev').disabled = cur===0;
+  const nx = document.getElementById('next');
+  nx.disabled = false;
+  nx.textContent = cur===STEPS.length-1 ? '↺ Start over' : 'Next step →';
+  highlight(s.hl);
+  wireTools();
+  try{ localStorage.setItem('nurseecg-step', cur); }catch(e){}
+  if(scroll) card.scrollIntoView({block:'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto':'smooth'});
+}
+
+function setOut(el, txt, cls){ el.textContent = txt; el.className = 'out' + (cls ? ' ' + cls : ''); }
+
+function wireTools(){
+  // Rate
+  const rm = document.getElementById('rm');
+  if(rm){
+    const rv = document.getElementById('rv'), out = document.getElementById('rout');
+    const calc = () => {
+      const v = parseFloat(rv.value), m = rm.value;
+      if(!(v > 0)) return setOut(out, 'Enter a number above 0.', '');
+      const hr = Math.round(m==='L' ? 300/v : m==='S' ? 1500/v : v*6);
+      const cls = hr < 50 || hr > 100 ? 'warn' : 'ok';
+      const note = hr > 100 ? 'Tachycardia (above 100 bpm)' : hr < 50 ? 'Bradycardia (below 50 bpm)' : hr < 60 ? 'Within guideline range; below the traditional 60 bpm' : 'Within normal range';
+      setOut(out, `≈ ${hr} bpm · ${note}`, cls);
+    };
+    rm.onchange = () => { rv.value = rm.value==='L' ? 4 : rm.value==='S' ? 20 : 8; calc(); };
+    rv.oninput = calc; calc();
+  }
+  // QTc
+  const qt = document.getElementById('qt');
+  if(qt){
+    const hr = document.getElementById('hr'), sx = document.getElementById('sx'), out = document.getElementById('qout');
+    const calc = () => {
+      const q = parseFloat(qt.value), h = parseFloat(hr.value);
+      if(!(q>0 && h>0)) return setOut(out,'Enter the QT in ms and the heart rate.','');
+      const rr = 60/h, baz = Math.round(q/Math.sqrt(rr)), fri = Math.round(q/Math.cbrt(rr));
+      const lim = sx.value==='f' ? 460 : 450, use = h > 100 ? fri : baz;
+      const cls = use > 500 ? 'bad' : use >= lim ? 'warn' : 'ok';
+      const note = use > 500 ? 'Above 500 ms: high risk, report now' : use >= lim ? 'Prolonged' : 'Not prolonged';
+      setOut(out, `Bazett ${baz} ms · Fridericia ${fri} ms → ${note}`, cls);
+    };
+    [qt,hr].forEach(x=>x.oninput=calc); sx.onchange = calc; calc();
+  }
+}
+
+/* ---------- extra sources ---------- */
+SOURCES.push(
+ ["Joglar JA, et al. 2023 ACC/AHA/ACCP/HRS guideline for the diagnosis and management of atrial fibrillation. Circulation. 2024;149:e1–e156.","https://doi.org/10.1161/CIR.0000000000001193"],
+ ["Page RL, et al. 2015 ACC/AHA/HRS guideline for the management of adult patients with supraventricular tachycardia. Circulation. 2016;133:e506–e574.","https://doi.org/10.1161/CIR.0000000000000311"],
+ ["Healio. Learn the Heart: ECG Review and ECG Library (example 12-lead tracings).","https://www.healio.com/cardiology/learn-the-heart/ecg-review"],
+ ["GE HealthCare Clinical View. Diagnostic ECG lead placement (AHA and IEC electrode labels and colours). 2022.","https://clinicalview.gehealthcare.com/poster/diagnostic-ecg-lead-placement"],
+ ["Faculty of Medicine, Uva Wellassa University of Sri Lanka. Standard operating procedure for performing a 12-lead electrocardiogram (ECG). 2026.","https://med.uwu.ac.lk/wp-content/uploads/2026/06/SOP-performing-an-ecg.pdf"]
+);
+
+/* ---------- rhythm strip generator (6 s, lead II style) ---------- */
+function rng(seed){ return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const SEC = 6;
+function sinusTimes(rr, pr, first){ const P=[],Q=[]; for(let q=first; q<SEC-.1; q+=rr){ P.push(q-pr); Q.push({t:q,rr}); } return {P,Q}; }
+function narrow(t,q,rr,o={}){
+  const tOff = Math.max(.17, Math.min(.3, .26*Math.sqrt(rr/.8)));
+  let v = g(t,q+.01,.008,-.1) + g(t,q+.04,.011,1.2) + g(t,q+.065,.009,-.25);
+  v += o.peakT ? g(t,q+tOff-.02,.028,.85) : g(t,q+tOff,rr<.5?.034:.045,.3);
+  if(o.st) v += g(t,q+.14,.06,.42);
+  return v;
+}
+function wide(t,q,o={}){ return g(t,q+.06,.032,1.1) + g(t,q+.14,.035,-.4) + g(t,q+(o.tOff||.34),.06,-.35); }
+const RHYTHMS = [
+ {id:"nsr", name:"Normal sinus rhythm", rate:"60–100 bpm", reg:"Regular", p:"Upright, one before each QRS", pr:"120–200 ms", qrs:"< 120 ms",
+  make(){ return sinusTimes(.8,.16,.56); },
+  feat:"Every QRS is preceded by an upright P wave in lead II with a constant PR interval, at a rate of 60–100 bpm.", act:"No action for the rhythm itself. Interpret it with the patient's condition and the rest of the 12-lead.", refs:[13,14]},
+ {id:"brady", name:"Sinus bradycardia", rate:"< 50 bpm (guideline) or < 60 (traditional)", reg:"Regular", p:"Normal", pr:"Normal", qrs:"Normal",
+  make(){ return sinusTimes(1.4,.17,.56); },
+  feat:"Sinus rhythm with a slow rate. Can be normal in athletes and during sleep, or caused by drugs (beta blockers, digoxin), hypothermia, hypothyroidism or raised intracranial pressure.", act:"Check for symptoms and poor perfusion. If symptomatic, follow the ACLS bradycardia algorithm (atropine first-line) and escalate.", refs:[9,11]},
+ {id:"stach", name:"Sinus tachycardia", rate:"> 100 bpm", reg:"Regular", p:"Normal, may merge with the preceding T wave", pr:"Normal", qrs:"Normal",
+  make(){ return sinusTimes(.5,.14,.56); },
+  feat:"Sinus rhythm faster than 100 bpm. Usually a response to something: pain, fever, anxiety, hypovolaemia, hypoxia, anaemia, sepsis or pulmonary embolism.", act:"Look for and treat the cause. Report a new, unexplained or persistent tachycardia.", refs:[13,14]},
+ {id:"af", name:"Atrial fibrillation", rate:"Variable", reg:"Irregularly irregular", p:"Absent; wavy fibrillatory baseline", pr:"None", qrs:"Usually < 120 ms",
+  make(){ const R=rng(7), Q=[]; let t=.3; while(t<SEC-.1){ const rr=.38+R()*.5; Q.push({t,rr}); t+=rr; } return {P:[],Q,extra:t=>.045*Math.sin(2*Math.PI*6.3*t)+.03*Math.sin(2*Math.PI*8.1*t+1)+.025*Math.sin(2*Math.PI*4.7*t+2)}; },
+  feat:"No organised atrial activity, so there are no P waves and the R–R intervals have no pattern.", act:"Assess stability and symptoms, record a 12-lead ECG and report. A clinician will assess rate control and stroke risk for anticoagulation.", refs:[15,11]},
+ {id:"flutter", name:"Atrial flutter (4:1)", rate:"Atria ~300/min; ventricles often 150 (2:1) or 75 (4:1)", reg:"Usually regular", p:"Sawtooth flutter waves", pr:"Not measurable", qrs:"Usually < 120 ms",
+  make(){ const {Q}=sinusTimes(.8,0,.56); return {P:[],Q,extra:t=>{ const x=((t-.02)*5)%1; return x<.8 ? -.2*x/.8+.06 : -.2*(1-x)/.2+.06; }}; },
+  feat:"A re-entry circuit in the right atrium produces regular sawtooth flutter waves, best seen in II, III, aVF and V1. A regular rate near 150 bpm should make you look for hidden 2:1 flutter.", act:"Assess stability, record a 12-lead and report. Management is similar to atrial fibrillation.", refs:[16,15]},
+ {id:"svt", name:"Supraventricular tachycardia", rate:"Typically 150–250 bpm", reg:"Regular", p:"Usually hidden or just after the QRS", pr:"Not measurable", qrs:"< 120 ms",
+  make(){ const {Q}=sinusTimes(.3,0,.56); return {P:[],Q}; },
+  feat:"A regular narrow-complex tachycardia with abrupt onset and offset, most often AV nodal re-entry (AVNRT).", act:"If stable: vagal manoeuvres, then adenosine as prescribed with continuous ECG recording. If unstable: synchronised cardioversion per ACLS.", refs:[16,11]},
+ {id:"avb1", name:"First-degree AV block", rate:"Any", reg:"Regular", p:"Normal, every P conducted", pr:"> 200 ms, constant", qrs:"Normal",
+  make(){ return sinusTimes(1.0,.3,.56); },
+  feat:"Slowed AV conduction makes the PR interval longer than 200 ms, but every P wave is still followed by a QRS.", act:"Usually no immediate treatment. Note it, review AV-node-slowing drugs, and watch for progression.", refs:[9]},
+ {id:"mob1", name:"Second-degree AV block, Mobitz I (Wenckebach)", rate:"Usually normal or slow", reg:"Regularly irregular (grouped beats)", p:"Regular", pr:"Lengthens until a QRS is dropped", qrs:"Usually normal",
+  make(){ const P=[],Q=[]; const prs=[.16,.26,.32,null]; let i=0; for(let p=.15;p<SEC-.3;p+=.8,i++){ P.push(p); const pr=prs[i%4]; if(pr) Q.push({t:p+pr,rr:.8}); } return {P,Q}; },
+  feat:"The PR interval gets longer with each beat until one P wave is not conducted; then the cycle repeats. The block is usually in the AV node.", act:"Usually benign if the patient is well. Check for symptoms and AV-node-slowing drugs, and report.", refs:[9]},
+ {id:"mob2", name:"Second-degree AV block, Mobitz II", rate:"Often slow", reg:"Irregular when beats drop", p:"Regular", pr:"Constant in conducted beats", qrs:"Often ≥ 120 ms",
+  make(){ const P=[],Q=[]; let i=0; for(let p=.2;p<SEC-.3;p+=.75,i++){ P.push(p); if(i%3!==2) Q.push({t:p+.18,rr:.75}); } return {P,Q}; },
+  feat:"The PR interval stays the same, then a P wave suddenly fails to conduct. The block is usually below the AV node and can progress to complete heart block.", act:"Escalate urgently. Monitor continuously, apply pacing pads per local policy, and follow the ACLS bradycardia algorithm if symptomatic.", refs:[9,11]},
+ {id:"chb", name:"Third-degree (complete) AV block", rate:"Ventricles often 20–40 bpm", reg:"Regular P–P and regular R–R, unrelated", p:"Regular, more P waves than QRS", pr:"Varies; no relationship", qrs:"Often wide (ventricular escape)",
+  make(){ const P=[]; for(let p=.2;p<SEC-.1;p+=.7) P.push(p); const W=[]; for(let q=.45;q<SEC-.3;q+=1.65) W.push(q); return {P,Q:[],W}; },
+  feat:"No atrial impulses reach the ventricles. P waves and QRS complexes march at their own rates, so the PR interval keeps changing, and a slow escape rhythm keeps the ventricles beating. Some P waves hide inside QRS complexes or T waves.", act:"Medical emergency. Check perfusion, call for help, apply pacing pads, and follow the ACLS bradycardia algorithm.", refs:[9,11]},
+ {id:"pvc", name:"Sinus rhythm with a PVC", rate:"Underlying rate", reg:"Irregular at the ectopic beat", p:"None before the PVC", pr:"—", qrs:"PVC ≥ 120 ms, bizarre shape",
+  make(){ const {P,Q}=sinusTimes(.8,.16,.56); const k=3; const t=Q[k].t-.3; Q.splice(k,1); P.splice(k,1); return {P,Q,W:[t]}; },
+  feat:"An early, wide QRS without a P wave, with a T wave pointing the opposite way, usually followed by a pause before the next sinus beat.", act:"Assess the patient. Check potassium and magnesium, and report if PVCs are new, frequent, in runs, or the patient has symptoms or ischaemia.", refs:[13,14]},
+ {id:"vt", name:"Ventricular tachycardia", rate:"> 100 bpm (often 150–250)", reg:"Usually regular", p:"Not seen or dissociated", pr:"None", qrs:"≥ 120 ms",
+  make(){ const W=[]; for(let q=.54;q<SEC-.2;q+=.4) W.push(q); return {P:[],Q:[],W,tOff:.24}; },
+  feat:"Three or more ventricular beats in a row at more than 100 bpm. A broad-complex tachycardia is VT until proven otherwise.", act:"Check for a pulse. No pulse: start CPR and defibrillate. Pulse but unstable: synchronised cardioversion. Stable: 12-lead ECG and urgent expert help.", refs:[11]},
+ {id:"vf", name:"Ventricular fibrillation", rate:"None measurable", reg:"Chaotic", p:"None", pr:"None", qrs:"No identifiable complexes",
+  make(){ return {P:[],Q:[],extra:t=>(.35+.25*Math.sin(2*Math.PI*.35*t))*(Math.sin(2*Math.PI*4.6*t)+.6*Math.sin(2*Math.PI*6.2*t+1.3)+.3*Math.sin(2*Math.PI*3.1*t+.4))}; },
+  feat:"Disorganised ventricular activity with no effective output. The patient is in cardiac arrest.", act:"Confirm the patient is unresponsive with no normal breathing or pulse. Call for help, start high-quality CPR and defibrillate as soon as possible.", refs:[11]},
+ {id:"asys", name:"Asystole", rate:"0", reg:"—", p:"Usually none", pr:"—", qrs:"None",
+  make(){ return {P:[],Q:[],extra:t=>.03*Math.sin(2*Math.PI*.3*t)+.01*Math.sin(2*Math.PI*1.7*t)}; },
+  feat:"A near-flat line with no ventricular activity. A disconnected lead or low gain can look the same.", act:"Check the patient and the leads, gain and a second lead. If confirmed: CPR and epinephrine per ACLS. Asystole is not shockable.", refs:[11]},
+ {id:"stemi", name:"Sinus rhythm with ST elevation", rate:"Any", reg:"Regular", p:"Normal", pr:"Normal", qrs:"Normal",
+  make(){ const r=sinusTimes(.8,.16,.56); r.st=true; return r; },
+  feat:"The ST segment is raised above the baseline at the J point. Two contiguous leads at or above the threshold (≥ 1 mm in most leads) suggest acute STEMI.", act:"Treat as an emergency: tell the clinician at once, record a full 12-lead, keep the patient monitored and follow the local chest pain or STEMI pathway.", refs:[6,10]},
+ {id:"hyperk", name:"Peaked T waves (hyperkalaemia)", rate:"Any", reg:"Regular", p:"May flatten as potassium rises", pr:"May lengthen", qrs:"May widen",
+  make(){ const r=sinusTimes(.8,.16,.56); r.peakT=true; return r; },
+  feat:"Tall, narrow, symmetrical T waves are the earliest classic sign of hyperkalaemia. The ECG does not reliably reflect the potassium level.", act:"Check the latest potassium, report urgently, keep the patient on a monitor and prepare for treatment as prescribed.", refs:[12,14]}
+];
+function stripPath(rh){
+  const d = rh.make(), W = 1500;
+  let s = '', first = true;
+  for(let x=0; x<=W; x+=1){
+    const t = x/(25*MM);
+    let v = d.extra ? d.extra(t) : 0;
+    for(const p of d.P) v += g(t,p+.05,.022,.15);
+    for(const q of d.Q) v += narrow(t,q.t,q.rr,{st:d.st,peakT:d.peakT});
+    for(const w of (d.W||[])) v += wide(t,w,{tOff:d.tOff});
+    s += (first?'M':'L') + x + ' ' + (BASE - v*10*MM).toFixed(1); first = false;
+  }
+  return s;
+}
+function paper(id, w){ return `<defs><pattern id="${id}s" width="${MM}" height="${MM}" patternUnits="userSpaceOnUse"><path d="M${MM} 0H0V${MM}" fill="none" stroke="var(--grid-minor)" stroke-width="1"/></pattern><pattern id="${id}l" width="${MM*5}" height="${MM*5}" patternUnits="userSpaceOnUse"><rect width="${MM*5}" height="${MM*5}" fill="url(#${id}s)"/><path d="M${MM*5} 0H0V${MM*5}" fill="none" stroke="var(--grid-major)" stroke-width="1.4"/></pattern></defs><rect width="${w}" height="${H}" fill="url(#${id}l)"/>`; }
+function drawStrip(svg, rh){ svg.innerHTML = paper(svg.id, 1500) + `<path d="${stripPath(rh)}" fill="none" stroke="var(--trace)" stroke-width="2" stroke-linejoin="round"/>`; }
+
+/* ---------- Rhythms tab ---------- */
+let curR = RHYTHMS[0].id;
+const rchips = document.getElementById('rchips');
+rchips.innerHTML = RHYTHMS.map(x=>`<button type="button" class="chipbtn" data-id="${x.id}">${x.name}</button>`).join('');
+rchips.onclick = e => { const b = e.target.closest('button'); if(b) showRhythm(b.dataset.id); };
+function showRhythm(id){
+  curR = id; const x = RHYTHMS.find(r=>r.id===id);
+  rchips.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed', b.dataset.id===id));
+  drawStrip(document.getElementById('rsvg'), x);
+  document.getElementById('rcap').textContent = x.name;
+  document.getElementById('rcard').innerHTML = `<p class="eyebrow">Rhythm</p><h2>${x.name}</h2>
+   <div class="facts"><div><div class="k">Rate</div><div class="v">${x.rate}</div></div><div><div class="k">Rhythm</div><div class="v">${x.reg}</div></div><div><div class="k">P waves</div><div class="v">${x.p}</div></div><div><div class="k">PR interval</div><div class="v">${x.pr}</div></div><div><div class="k">QRS</div><div class="v">${x.qrs}</div></div></div>
+   <h3>Key features</h3><p>${x.feat} ${r(...x.refs)}</p>
+   <div class="tip"><b>Nursing action.</b> ${x.act} ${r(...x.refs)}</div>`;
+}
+
+/* ---------- Quiz ---------- */
+/* ---------- Quiz: every question is read from a strip ---------- */
+const shuffle = a => { a = a.slice(); for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; };
+const OPT = {
+  reg:{R:"Regular", RI:"Regularly irregular (grouped beats)", II:"Irregularly irregular", E:"Regular, with one early beat", N:"No organised rhythm"},
+  p:{A:"One upright P wave before every QRS", B:"No P waves; wavy, chaotic baseline", C:"Sawtooth flutter waves", D:"More P waves than QRS complexes", E:"No visible P waves"},
+  pr:{N:"120–200 ms and constant", L:"Over 200 ms and constant", W:"Gets longer until a QRS is dropped", M:"Constant, with some P waves not conducted", X:"No relationship between P waves and QRS"},
+  qrs:{N:"Narrow (under 120 ms)", W:"Wide (120 ms or more)", E:"Narrow, with one early wide beat", X:"No identifiable QRS complexes"},
+  st:{E:"ST elevation", D:"ST depression", T:"Tall, narrow, peaked T waves", N:"Normal ST segment and T waves"}
+};
+const EXPL = {
+  reg:{R:"The R–R intervals are the same all the way across the strip.", RI:"The R–R intervals change in a repeating pattern, with beats in groups separated by a pause.", II:"The R–R intervals vary with no pattern at all. This is the hallmark of atrial fibrillation.", E:"The R–R intervals are equal except where one beat arrives early and is followed by a pause.", N:"There are no organised QRS complexes, so there is no R–R interval to measure."},
+  p:{A:"Each QRS has one upright P wave in front of it, which shows the beat started in the sinus node.", B:"There are no P waves, only small, irregular fibrillatory waves on the baseline.", C:"The baseline shows regular sawtooth flutter waves at about 300 per minute instead of P waves.", D:"Count the P waves and the QRS complexes: there are more P waves, so some atrial impulses are not reaching the ventricles.", E:"No P waves can be seen before the QRS complexes; they are absent or hidden."},
+  qrs:{N:"The QRS is under 3 small squares (120 ms).", W:"The QRS is 3 small squares (120 ms) or wider, so the beats start in the ventricles or conduct abnormally.", E:"The normal beats are narrow, but one early beat is wide and has no P wave in front of it: a premature ventricular complex.", X:"There are no QRS complexes to measure."},
+  st:{E:"The segment after the QRS is raised above the baseline before the T wave.", T:"The T waves are tall, narrow and pointed, taller than the usual rounded T wave.", D:"The ST segment sits below the baseline.", N:"The ST segment is level with the baseline and the T waves are normal."}
+};
+const QMETA = {
+  nsr:{rr:4, reg:"R", p:"A", pr:"N", prx:"The PR interval is 160 ms (4 small squares) and the same in every beat.", qrs:"N", key:"pr"},
+  brady:{rr:7, reg:"R", p:"A", pr:"N", qrs:"N", key:"p"},
+  stach:{rr:2.5, reg:"R", p:"A", pr:"N", qrs:"N", key:"p"},
+  af:{reg:"II", p:"B", qrs:"N", key:"p"},
+  flutter:{rr:4, reg:"R", p:"C", qrs:"N", key:"p"},
+  svt:{rr:1.5, reg:"R", p:"E", qrs:"N", key:"p"},
+  avb1:{rr:5, reg:"R", p:"A", pr:"L", prx:"The PR interval is 300 ms (7–8 small squares), longer than 200 ms, but every P wave is followed by a QRS.", qrs:"N", key:"pr"},
+  mob1:{reg:"RI", p:"D", pr:"W", prx:"Measure each PR: it gets longer beat by beat until a P wave has no QRS after it, then the cycle starts again.", qrs:"N", key:"pr"},
+  mob2:{reg:"RI", p:"D", pr:"M", prx:"The PR interval is the same in every conducted beat, then a P wave suddenly has no QRS after it.", qrs:"N", key:"pr"},
+  chb:{reg:"R", p:"D", pr:"X", prx:"P waves march at their own regular rate and QRS complexes at a slower one, so the PR interval keeps changing.", qrs:"W", key:"pr"},
+  pvc:{reg:"E", qrs:"E", key:"qrs"},
+  vt:{rr:2, reg:"R", p:"E", qrs:"W", key:"qrs"},
+  vf:{reg:"N", qrs:"X", key:"qrs", norate:true},
+  asys:{reg:"N", qrs:"X", key:"qrs", norate:true},
+  stemi:{rr:4, reg:"R", p:"A", pr:"N", qrs:"N", st:"E", key:"st"},
+  hyperk:{rr:4, reg:"R", p:"A", pr:"N", qrs:"N", st:"T", key:"st"}
+};
+const STEPNAME = {rate:"Step 1 · Heart rate", reg:"Step 2 · Rhythm", p:"Step 3 · P waves", pr:"Step 4 · PR interval", qrs:"Step 5 · QRS complex", st:"Steps 6–7 · ST segment and T waves", dx:"Put it together"};
+const STEPLBL = {rate:'heart rate', reg:'rhythm', p:'P waves', pr:'PR interval', qrs:'QRS complex', st:'ST segment and T waves', dx:'interpretation'};
+function pickOpts(set, correct){ const keys = shuffle(Object.keys(set).filter(k=>k!==correct)).slice(0,3); return shuffle([correct,...keys]).map(k=>set[k]); }
+function caseQuestions(rh){
+  const m = QMETA[rh.id], d = rh.make(), qs = [];
+  if(!m.norate){
+    const n = d.Q.length + (d.W||[]).length;
+    let ans, e;
+    if(m.rr){ ans = Math.round(300/m.rr); e = `R–R = ${m.rr} large squares, so 300 ÷ ${m.rr} = ${ans} bpm.`; }
+    else { ans = n*10; e = `The rhythm is not regular, so count the QRS complexes: ${n} in this 6-second strip, × 10 = ${ans} bpm. (On a 10-second 12-lead strip, multiply by 6.)`; }
+    const pool = [];
+    for(const v of shuffle([Math.round(ans*.5), Math.round(ans*1.5), ans+30, ans-20, ans*2, ans+50])) if(v>10 && [ans,...pool].every(u=>Math.abs(u-v)>=10) && pool.length<3) pool.push(v);
+    qs.push({step:"rate", q:"What is the ventricular heart rate?", a:`${ans} bpm`, opts:shuffle([ans,...pool]).map(v=>`${v} bpm`), e, refs:m.rr?[12,13]:[13,14]});
+  }
+  qs.push({step:"reg", q:"Is the rhythm regular?", a:OPT.reg[m.reg], opts:pickOpts(OPT.reg,m.reg), e:EXPL.reg[m.reg]+" Check by marking two R waves on paper and moving it along the strip.", refs:[13,14]});
+  const k = m.key;
+  if(k==="p") qs.push({step:"p", q:"Look at the atrial activity. What do you see?", a:OPT.p[m.p], opts:pickOpts(OPT.p,m.p), e:EXPL.p[m.p], refs:[13,14]});
+  if(k==="pr") qs.push({step:"pr", q:"What does the PR interval show?", a:OPT.pr[m.pr], opts:pickOpts(OPT.pr,m.pr), e:m.prx, refs:[9,13]});
+  if(k==="qrs") qs.push({step:"qrs", q:"How would you describe the QRS complexes?", a:OPT.qrs[m.qrs], opts:pickOpts(OPT.qrs,m.qrs), e:EXPL.qrs[m.qrs], refs:[2,14]});
+  if(k==="st") qs.push({step:"st", q:"Look at the ST segments and T waves. What stands out?", a:OPT.st[m.st], opts:pickOpts(OPT.st,m.st), e:EXPL.st[m.st], refs:m.st==="E"?[6]:[12,14]});
+  const others = shuffle(RHYTHMS.filter(y=>y.id!==rh.id)).slice(0,3).map(y=>y.name);
+  qs.push({step:"dx", q:"Putting it all together, what is this rhythm?", a:rh.name, opts:shuffle([rh.name,...others]), e:rh.feat+" Nursing action: "+rh.act, refs:rh.refs});
+  return qs.map(x=>({...x, strip:rh}));
+}
+let QZ = null;
+const NQ = 10;
+function readingOf(rh){
+  const m = QMETA[rh.id], d = rh.make(), parts = [];
+  if(!m.norate){ const n = d.Q.length + (d.W||[]).length; parts.push(m.rr ? `<b>Rate:</b> R–R = ${m.rr} large squares, 300 ÷ ${m.rr} = ${Math.round(300/m.rr)} bpm.` : `<b>Rate:</b> ${n} QRS in 6 s × 10 = ${n*10} bpm.`); }
+  parts.push(`<b>Rhythm:</b> ${OPT.reg[m.reg]}.`);
+  if(m.p) parts.push(`<b>P waves:</b> ${OPT.p[m.p]}.`);
+  if(m.pr) parts.push(`<b>PR:</b> ${OPT.pr[m.pr]}.`);
+  parts.push(`<b>QRS:</b> ${OPT.qrs[m.qrs]}.`);
+  if(m.st) parts.push(`<b>ST/T:</b> ${OPT.st[m.st]}.`);
+  return parts.join(' ');
+}
+function newQuiz(){
+  const items = shuffle(RHYTHMS).slice(0,NQ).map((rh,i)=>({ci:i, strip:rh, step:"dx", q:"What is this rhythm?", a:rh.name,
+    opts:shuffle([rh.name, ...shuffle(RHYTHMS.filter(y=>y.id!==rh.id)).slice(0,3).map(y=>y.name)]),
+    e:`${readingOf(rh)}<br><br>${rh.feat}<br><b>Nursing action:</b> ${rh.act}`, refs:rh.refs}));
+  QZ = {items, i:0, score:0, missed:[], answered:false};
+  renderQ();
+}
+function renderQ(){
+  const c = document.getElementById('qcard'), n = QZ.items.length;
+  if(QZ.i >= n){
+    c.innerHTML = `<p class="eyebrow">Result</p><div class="qscore">${QZ.score} / ${n}</div><p>${QZ.score===n?'Excellent. You identified every rhythm correctly.':QZ.score>=n*.7?'Good reading. Review the ones you missed below.':'Keep practising. Go back through the Guide and Rhythms tabs, then try again.'}</p>
+     ${QZ.missed.length?`<h3>Review</h3><ol class="qmiss">${QZ.missed.map(m=>`<li>${m.q} <b>${m.a}</b><span>${m.e}</span></li>`).join('')}</ol>`:''}
+     <div class="pager"><span></span><button type="button" class="primary" id="qnew">New quiz</button></div>`;
+    document.getElementById('qnew').onclick = newQuiz; return;
+  }
+  const it = QZ.items[QZ.i];
+  c.innerHTML = `<div class="wbar"><i style="width:${Math.round(QZ.i/n*100)}%"></i></div><div class="qtop"><span>Strip ${QZ.i+1} of ${n}</span><span>Score ${QZ.score}</span></div>
+   <div class="strip"><svg id="qsvg" viewBox="0 0 1500 220" role="img" aria-label="Rhythm strip to read"></svg><div class="strip-cap"><span>Lead II · 6 seconds</span><span>25 mm/s · 1 large square = 0.20 s · 1 small square = 0.04 s</span></div></div>
+   <p class="qq" style="margin-top:14px">${it.q}</p><div class="qopts">${it.opts.map((o,k)=>`<button type="button" data-k="${k}">${o}</button>`).join('')}</div><div id="qfb"></div>`;
+  drawStrip(document.getElementById('qsvg'), it.strip);
+  QZ.answered = false;
+  c.querySelector('.qopts').onclick = e => {
+    const b = e.target.closest('button'); if(!b || QZ.answered) return; QZ.answered = true;
+    const pick = it.opts[+b.dataset.k], ok = pick === it.a;
+    if(ok) QZ.score++; else QZ.missed.push({q:`Strip ${QZ.i+1}:`, a:it.a, e:it.e});
+    c.querySelectorAll('.qopts button').forEach(x=>{ x.disabled = true; const o = it.opts[+x.dataset.k]; if(o===it.a) x.classList.add('right'); else if(x===b) x.classList.add('wrong'); });
+    const last = QZ.i+1>=n, nextCase = !last && QZ.items[QZ.i+1].ci !== it.ci;
+    document.getElementById('qfb').innerHTML = `<div class="qfb ${ok?'ok':'no'}"><span class="vl">${ok?'Correct.':'Not quite. The answer is: '+it.a+'.'}</span><p>${it.e} ${r(...it.refs)}</p></div>
+     <div class="pager"><span></span><button type="button" class="primary" id="qnext">${last?'See result':'Next strip →'}</button></div>`;
+    document.getElementById('qnext').onclick = () => { QZ.i++; renderQ(); document.getElementById('qcard').scrollIntoView({block:'start'}); };
+  };
+}
+
+/* ---------- Tabs ---------- */
+const TABS = ['guide','placement','rhythms','quiz'];
+function showTab(t){
+  if(!TABS.includes(t)) t = 'guide';
+  TABS.forEach(x => document.getElementById('page-'+x).hidden = x!==t);
+  document.querySelectorAll('.topbar .tabs a').forEach(a => a.toggleAttribute('aria-current', a.dataset.tab===t) && a.setAttribute('aria-current','page'));
+  if(t==='rhythms') showRhythm(curR);
+  if(t==='quiz' && !QZ) newQuiz();
+}
+document.querySelector('.topbar .tabs').addEventListener('click', e => { const a = e.target.closest('a'); if(!a) return; e.preventDefault(); showTab(a.dataset.tab); try{ history.replaceState(null,'','#'+a.dataset.tab); }catch(err){} scrollTo(0,0); });
+document.addEventListener('click', e => { const gt = e.target.closest('a[data-goto]'); if(gt){ e.preventDefault(); showTab(gt.dataset.goto); scrollTo(0,0); return; } const a = e.target.closest('a[href^="#src"]'); if(!a) return; e.preventDefault(); const el = document.getElementById(a.getAttribute('href').slice(1)); if(el){ el.scrollIntoView({block:'center'}); el.style.color='var(--ink)'; setTimeout(()=>el.style.color='',1500); } });
+
+drawECG();
+let start = 0;
+try{ const s = parseInt(localStorage.getItem('nurseecg-step'),10); if(s>=0 && s<STEPS.length) start = s; }catch(e){}
+go(start, false);
+document.getElementById('srclist').innerHTML = SOURCES.map((s,i)=>`<li id="src${i+1}">${s[0]}${s[1]?` <a href="${s[1]}">${s[1].replace(/^https:\/\//,'')}</a>`:''}</li>`).join('');
+showTab((location.hash||'').slice(1));
+</script>
+
+</body></html>
